@@ -1,0 +1,42 @@
+{
+  "q_001": {
+    "sql": "SELECT g.Name AS Genre, SUM(il.UnitPrice * il.Quantity) AS TotalSales\nFROM InvoiceLine il\nJOIN Track t ON il.TrackId = t.TrackId\nJOIN Genre g ON t.GenreId = g.GenreId\nGROUP BY g.GenreId, g.Name\nORDER BY TotalSales DESC\nLIMIT 5;",
+    "answer": "The top five best‑selling genres are Rock ($826.65), Latin ($382.14), Metal ($261.36), Alternative & Punk ($241.56) and TV Shows ($93.53)."
+  },
+  "q_002": {
+    "sql": "SELECT Album.Title FROM Album JOIN Artist ON Album.ArtistId = Artist.ArtistId WHERE Artist.Name = 'AC/DC';",
+    "answer": "AC/DC’s albums are “For Those About To Rock We Salute You” and “Let There Be Rock”."
+  },
+  "q_003": {
+    "sql": "SELECT FirstName, LastName, Email FROM Customer WHERE Country = 'Brazil';",
+    "answer": "Luís Gonçalves (luisg@embraer.com.br), Eduardo Martins (eduardo@woodstock.com.br), Alexandre Rocha (alero@uol.com.br), Roberto Almeida (roberto.almeida@riotur.gov.br) and Fernanda Ramos (fernadaramos4@uol.com.br)."
+  },
+  "q_004": {
+    "sql": "SELECT mt.Name AS MediaType, COUNT(t.TrackId) AS TrackCount\nFROM MediaType mt\nJOIN Track t ON t.MediaTypeId = mt.MediaTypeId\nGROUP BY mt.MediaTypeId, mt.Name\nORDER BY TrackCount DESC\nLIMIT 1;",
+    "answer": "The most popular media type is “MPEG audio file,” with 3,034 tracks."
+  },
+  "q_005": {
+    "sql": "SELECT e.EmployeeId, e.FirstName, e.LastName, COUNT(c.CustomerId) AS CustomerCount\nFROM Employee e\nLEFT JOIN Customer c ON c.SupportRepId = e.EmployeeId\nGROUP BY e.EmployeeId, e.FirstName, e.LastName\nORDER BY CustomerCount DESC\nLIMIT 1;",
+    "answer": "Jane Peacock has the most customers assigned to her, with 21 customers."
+  },
+  "q_006": {
+    "sql": "SELECT p.PlaylistId, p.Name, COUNT(pt.TrackId) AS TrackCount\nFROM Playlist AS p\nLEFT JOIN PlaylistTrack AS pt ON p.PlaylistId = pt.PlaylistId\nGROUP BY p.PlaylistId, p.Name\nORDER BY p.PlaylistId;",
+    "answer": "The playlists contain the following numbers of tracks: Playlist 1 “Music” – 3,290; Playlist 2 “Movies” – 0; Playlist 3 “TV Shows” – 213; Playlist 4 “Audiobooks” – 0; Playlist 5 “90’s Music” – 1,477; Playlist 6 “Audiobooks” – 0; Playlist 7 “Movies” – 0; Playlist 8 “Music” – 3,290; Playlist 9 “Music Videos” – 1; Playlist 10 “TV Shows” – 213; Playlist 11 “Brazilian Music” – 39; Playlist 12 “Classical” – 75; Playlist 13 “Classical 101 – Deep Cuts” – 25; Playlist 14 “Classical 101 – Next Steps” – 25; Playlist 15 “Classical 101 – The Basics” – 25; Playlist 16 “Grunge” – 15; Playlist 17 “Heavy Metal Classic” – 26; Playlist 18 “On‑The‑Go 1” – 1."
+  },
+  "q_007": {
+    "sql": "SELECT SUM(Invoice.Total) AS TotalRevenue2021\nFROM Invoice\nWHERE strftime('%Y', Invoice.InvoiceDate) = '2021';",
+    "answer": "The total revenue generated in 2021 was $449.46."
+  },
+  "q_008": {
+    "sql": "SELECT Invoice.BillingCountry AS Country,\n       AVG(Invoice.Total) AS AvgTotal\nFROM Invoice\nGROUP BY Invoice.BillingCountry\nORDER BY AvgTotal DESC;",
+    "answer": "The average invoice total by billing country, from highest to lowest, is: Chile $6.66, Ireland $6.52, Hungary $6.52, Czech Republic $6.45, Austria $6.09, Finland $5.95, Netherlands $5.80, India $5.79, USA $5.75, Norway $5.66, Germany $5.59, France $5.57, Sweden $5.52, Portugal $5.52, Brazil $5.43, Canada $5.43, and United Kingdom, Spain, Poland, Italy, Denmark, Belgium, Australia, and Argentina each at $5.37."
+  },
+  "q_009": {
+    "sql": "SELECT CustomerId, FirstName, LastName, TotalSpending,\n       RANK() OVER (ORDER BY TotalSpending DESC) AS Rank\nFROM (\n    SELECT c.CustomerId, c.FirstName, c.LastName,\n           IFNULL(SUM(i.Total), 0) AS TotalSpending\n    FROM Customer c\n    LEFT JOIN Invoice i ON i.CustomerId = c.CustomerId\n    GROUP BY c.CustomerId, c.FirstName, c.LastName\n) \nORDER BY TotalSpending DESC\nLIMIT 5;",
+    "answer": "The top five spenders are Helena Holý (Customer 6) with $49.62 (rank 1), Richard Cunningham (Customer 26) with $47.62 (rank 2), Luis Rojas (Customer 57) with $46.62 (rank 3), and Ladislav Kovács (Customer 45) and Hugh O'Reilly (Customer 46) each with $45.62 (tied for rank 4)."
+  },
+  "q_010": {
+    "sql": "SELECT a.Name AS ArtistName,\n       COUNT(DISTINCT t.GenreId) AS GenreCount\nFROM Artist a\nJOIN Album al ON al.ArtistId = a.ArtistId\nJOIN Track t ON t.AlbumId = al.AlbumId\nWHERE t.GenreId IS NOT NULL\nGROUP BY a.ArtistId, a.Name\nHAVING COUNT(DISTINCT t.GenreId) > 3\nORDER BY GenreCount DESC, ArtistName;",
+    "answer": "Iron Maiden has tracks in 4 different genres."
+  }
+}
