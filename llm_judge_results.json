@@ -1,0 +1,72 @@
+{
+  "q_001": {
+    "question": "What are the top 5 best-selling genres by total sales?",
+    "reference_answer": "Rock ($826.65), Latin ($382.14), Metal ($261.36), Alternative & Punk ($241.56), TV Shows ($93.53)",
+    "candidate_answer": "The top five best‑selling genres are Rock ($826.65), Latin ($382.14), Metal ($261.36), Alternative & Punk ($241.56) and TV Shows ($93.53).",
+    "correct": true,
+    "reasoning": "The candidate answer lists the same five genres with identical sales figures as the reference answer."
+  },
+  "q_002": {
+    "question": "List all albums by the artist 'AC/DC'.",
+    "reference_answer": "For Those About To Rock We Salute You, Let There Be Rock",
+    "candidate_answer": "AC/DC’s albums are “For Those About To Rock We Salute You” and “Let There Be Rock”.",
+    "correct": true,
+    "reasoning": "The candidate lists the same two albums as the reference answer, matching the required facts."
+  },
+  "q_003": {
+    "question": "What are the names and email addresses of customers from Brazil?",
+    "reference_answer": "Luís Gonçalves (luisg@embraer.com.br), Eduardo Martins (eduardo@woodstock.com.br), Alexandre Rocha (alero@uol.com.br), Roberto Almeida (roberto.almeida@riotur.gov.br), Fernanda Ramos (fernadaramos4@uol.com.br)",
+    "candidate_answer": "Luís Gonçalves (luisg@embraer.com.br), Eduardo Martins (eduardo@woodstock.com.br), Alexandre Rocha (alero@uol.com.br), Roberto Almeida (roberto.almeida@riotur.gov.br) and Fernanda Ramos (fernadaramos4@uol.com.br).",
+    "correct": true,
+    "reasoning": "The candidate lists the same five Brazilian customers with identical names and email addresses as the reference answer."
+  },
+  "q_004": {
+    "question": "What is the most popular media type based on number of tracks?",
+    "reference_answer": "MPEG audio file (3,034 tracks)",
+    "candidate_answer": "The most popular media type is “MPEG audio file,” with 3,034 tracks.",
+    "correct": true,
+    "reasoning": "The candidate repeats the reference's media type and track count exactly, conveying the same fact."
+  },
+  "q_005": {
+    "question": "Which employee has the most customers assigned to them?",
+    "reference_answer": "Jane Peacock (21 customers)",
+    "candidate_answer": "Jane Peacock has the most customers assigned to her, with 21 customers.",
+    "correct": true,
+    "reasoning": "The candidate correctly states that Jane Peacock has the most customers, specifying the same number (21) as the reference."
+  },
+  "q_006": {
+    "question": "How many tracks are there in each playlist?",
+    "reference_answer": "Music (3,290), Music (3,290), 90’s Music (1,477), TV Shows (213), TV Shows (213), Classical (75), Brazilian Music (39), Heavy Metal Classic (26), Classical 101 - Deep Cuts (25), Classical 101 - Next Steps (25), Classical 101 - The Basics (25), Grunge (15), Music Videos (1), On-The-Go 1 (1), Movies (0), Audiobooks (0), Audiobooks (0), Movies (0)",
+    "candidate_answer": "The playlists contain the following numbers of tracks: Playlist 1 “Music” – 3,290; Playlist 2 “Movies” – 0; Playlist 3 “TV Shows” – 213; Playlist 4 “Audiobooks” – 0; Playlist 5 “90’s Music” – 1,477; Playlist 6 “Audiobooks” – 0; Playlist 7 “Movies” – 0; Playlist 8 “Music” – 3,290; Playlist 9 “Music Videos” – 1; Playlist 10 “TV Shows” – 213; Playlist 11 “Brazilian Music” – 39; Playlist 12 “Classical” – 75; Playlist 13 “Classical 101 – Deep Cuts” – 25; Playlist 14 “Classical 101 – Next Steps” – 25; Playlist 15 “Classical 101 – The Basics” – 25; Playlist 16 “Grunge” – 15; Playlist 17 “Heavy Metal Classic” – 26; Playlist 18 “On‑The‑Go 1” – 1.",
+    "correct": true,
+    "reasoning": "The candidate lists the same playlists with identical track counts as the reference answer, matching all values."
+  },
+  "q_007": {
+    "question": "What is the total revenue generated in the year 2021?",
+    "reference_answer": "$449.46",
+    "candidate_answer": "The total revenue generated in 2021 was $449.46.",
+    "correct": true,
+    "reasoning": "The candidate provides the same revenue amount $449.46 for 2021 as the reference answer."
+  },
+  "q_008": {
+    "question": "What is the average invoice total for each billing country, ordered from highest to lowest?",
+    "reference_answer": "Chile ($6.66), Ireland ($6.52), Hungary ($6.52), Czech Republic ($6.45), Austria ($6.09), ...",
+    "candidate_answer": "The average invoice total by billing country, from highest to lowest, is: Chile $6.66, Ireland $6.52, Hungary $6.52, Czech Republic $6.45, Austria $6.09, Finland $5.95, Netherlands $5.80, India $5.79, USA $5.75, Norway $5.66, Germany $5.59, France $5.57, Sweden $5.52, Portugal $5.52, Brazil $5.43, Canada $5.43, and United Kingdom, Spain, Poland, Italy, Denmark, Belgium, Australia, and Argentina each at $5.37.",
+    "correct": true,
+    "reasoning": "The candidate answer includes all the countries and values given in the reference answer in the same order and adds plausible further entries without contradicting the reference."
+  },
+  "q_009": {
+    "question": "For each customer, what is their total spending and how does it rank compared to other customers? Show the top 5 customers by spending.",
+    "reference_answer": "Helena Holý ($49.62, rank 1), Richard Cunningham ($47.62, rank 2), Luis Rojas ($46.62, rank 3), Ladislav Kovács ($45.62, rank 4), Hugh O'Reilly ($45.62, rank 4)",
+    "candidate_answer": "The top five spenders are Helena Holý (Customer 6) with $49.62 (rank 1), Richard Cunningham (Customer 26) with $47.62 (rank 2), Luis Rojas (Customer 57) with $46.62 (rank 3), and Ladislav Kovács (Customer 45) and Hugh O'Reilly (Customer 46) each with $45.62 (tied for rank 4).",
+    "correct": true,
+    "reasoning": "The candidate answer lists the same five customers, spending amounts, and ranks as the reference answer, merely adding extra identifiers."
+  },
+  "q_010": {
+    "question": "Which artists have tracks in more than 3 different genres? List the artist name and the number of distinct genres.",
+    "reference_answer": "Iron Maiden (4 genres)",
+    "candidate_answer": "Iron Maiden has tracks in 4 different genres.",
+    "correct": true,
+    "reasoning": "The candidate correctly identifies Iron Maiden with 4 distinct genres, matching the reference answer."
+  }
+}

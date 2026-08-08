@@ -10,18 +10,24 @@ An interactive terminal tool that converts natural-language questions into SQL, 
 
 ## Setup
 
-1. **Install dependencies:**
+1. **Open a terminal in this folder.** After unzipping, navigate into the folder that contains this README (the same folder as `pyproject.toml` and `setup.sh`):
+   ```bash
+   cd path/to/this-folder
+   ```
+   Every command below assumes you're running it from here.
+
+2. **Install dependencies:**
    ```bash
    uv sync
    ```
 
-2. **Set your Fireworks API key** as an environment variable:
+3. **Set your Fireworks API key** as an environment variable:
    ```bash
    export FIREWORKS_API_KEY=your_key_here
    ```
    Alternatively, copy `.env.example` to `.env` and fill in your key there; it's loaded automatically.
 
-3. **(This demo only) Download the sample database:**
+4. **(This demo only) Download the sample database:**
    ```bash
    ./setup.sh
    ```

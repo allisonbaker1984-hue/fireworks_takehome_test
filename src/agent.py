@@ -108,6 +108,103 @@ class SQLGenerationResult(BaseModel):
     )
 
 
+# Structured-output schema for judge_answer's verdict. Unlike
+# SQLGenerationResult, this isn't sent on every production query (it's an
+# offline evaluation tool), so token-bloat-from-the-docstring isn't the
+# concern it is there -- kept undocumented anyway for consistency.
+class JudgeVerdict(BaseModel):
+    correct: bool = Field(
+        description=(
+            "Whether the candidate answer is substantively correct given "
+            "the reference answer -- same facts and values, even if the "
+            "wording, formatting, or field layout differs."
+        )
+    )
+    reasoning: str = Field(
+        description="One sentence explaining the verdict."
+    )
+
+
+def judge_answer(
+    client: OpenAI,
+    model: str,
+    question: str,
+    reference_answer: str,
+    candidate_answer: str,
+) -> JudgeVerdict:
+    """
+    LLM-as-judge: decide whether `candidate_answer` substantively answers
+    `question` the same way `reference_answer` does.
+
+    This exists to cover a real gap in mechanical grading: `results_match`
+    (utils.py) compares SQL execution results by value containment, which
+    can't see through formatting differences like a reference row
+    concatenating "FirstName LastName" into one string while the candidate
+    returns them as separate columns -- same underlying fact, flagged as a
+    mismatch anyway. An LLM judge can recognize that kind of equivalence
+    directly instead of demanding byte-for-byte value matches.
+
+    Deliberately a standalone function rather than a TextToSQLAgent method:
+    judging an already-produced answer has no dependency on a database
+    connection, schema, or session state, so it shouldn't need one.
+
+    Args:
+        client: An OpenAI-compatible client (e.g. a TextToSQLAgent's
+            `.client`, or a fresh `OpenAI(...)` instance).
+        model: Fireworks model identifier to use as the judge.
+        question: The original natural-language question.
+        reference_answer: The gold/reference human-readable answer.
+        candidate_answer: The system-generated human-readable answer being
+            graded.
+
+    Returns:
+        JudgeVerdict: `correct` plus a one-sentence `reasoning`.
+
+    Raises:
+        RuntimeError: If Fireworks returns an empty completion.
+    """
+    response = client.chat.completions.create(
+        model=model,
+        temperature=0,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "JudgeVerdict",
+                "schema": JudgeVerdict.model_json_schema(),
+            },
+        },
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are grading whether a candidate answer to a "
+                    "question is substantively correct, given a reference "
+                    "answer known to be correct. Two answers can differ in "
+                    "wording, formatting, ordering, or how fields are "
+                    "split or combined (e.g. one concatenated name string "
+                    "vs. separate first/last name fields) and still be "
+                    "correct if they convey the same facts and values. "
+                    "Mark a candidate incorrect only if it states a "
+                    "different fact, a wrong value, or omits information "
+                    "the reference includes."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Question: {question}\n"
+                    f"Reference answer: {reference_answer}\n"
+                    f"Candidate answer: {candidate_answer}"
+                ),
+            },
+        ],
+    )
+    raw_content = response.choices[0].message.content
+    if raw_content is None:
+        raise RuntimeError("Fireworks returned an empty completion.")
+    return JudgeVerdict.model_validate_json(raw_content)
+
+
 @dataclass
 class QueryResult:
     """
