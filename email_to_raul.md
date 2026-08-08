@@ -30,4 +30,4 @@ It's the only model that stayed both fast and accurate across two separate compa
 This was a fun one to dig into, would love to walk through the code and decisions together whenever works for you.
 
 Best,
-[Your name]
+Allison
