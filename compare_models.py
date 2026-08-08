@@ -34,6 +34,20 @@ MODELS = {
         "cached_input": 0.38,
         "output": 8.00,
     },
+    # Genuinely different model families (not just another serving tier of
+    # the same weights), added to check whether Kimi is actually the best
+    # available option here or just the only one we'd tried. Both are
+    # dramatically cheaper per-token than either Kimi variant above.
+    "accounts/fireworks/models/gpt-oss-120b": {
+        "input": 0.15,
+        "cached_input": 0.014,
+        "output": 0.60,
+    },
+    "accounts/fireworks/models/deepseek-v4-flash": {
+        "input": 0.14,
+        "cached_input": 0.028,
+        "output": 0.28,
+    },
 }
 
 

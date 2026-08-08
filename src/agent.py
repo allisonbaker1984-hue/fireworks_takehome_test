@@ -28,20 +28,32 @@ FIREWORKS_BASE_URL = "https://api.fireworks.ai/inference/v1"
 # -- see compare_models.py / model_comparison.json for the actual head-to-
 # head this default is based on, not a guess.
 #
-# `kimi-k2p7-code-fast` (the router-served fast variant of Fireworks' code-
-# specialized model) was chosen over the plain `kimi-k2p7-code` after
-# measuring both on all 10 dev questions: identical accuracy (8/10 exact
-# match, 10/10 substantively correct on manual review -- see
-# generate_dev_answers.py's output), but P50 latency of 1.80s vs. 3.32s and
-# a much tighter tail (4.02s max vs. 14.12s max). A follow-up controlled
-# test (diagnose_latency.py) ruled out response length as the cause of the
-# base model's variance (latency vs. completion-token correlation ~0) and
-# showed connection reuse only partially explains it -- pointing to serving
-# -side variance on the base model's standard tier rather than anything
-# fixable in our request handling, which `-fast` sidesteps. Costs roughly
-# 2x more per query, which is still negligible at this scale.
+# History of this default, since it's changed twice on real evidence rather
+# than being picked once and left alone:
+#   1. `kimi-k2p7-code` (Kimi's code-specialized model) -- initial pick,
+#      confirmed live and deployed for this account, no comparison behind it
+#      yet.
+#   2. `kimi-k2p7-code-fast` -- switched after measuring it against #1 on
+#      all 10 dev questions: identical accuracy, P50 1.80s vs. 3.32s, much
+#      tighter tail (4.02s max vs. 14.12s max). diagnose_latency.py ruled
+#      out response length as the cause of #1's variance and pointed to
+#      serving-side variance on its standard tier, which `-fast` sidesteps.
+#   3. `gpt-oss-120b` (current) -- the comparison up to this point only
+#      covered one model family (Kimi) on two serving tiers of the SAME
+#      weights, which doesn't actually establish Kimi was the best choice
+#      available, just the only one tried. Broadened the comparison to 4
+#      models including two different families (gpt-oss, DeepSeek). Result:
+#      identical accuracy to every other model tested (8/10, same 2 known-
+#      benign mismatches across the board -- see results_match's docstring
+#      in utils.py), BETTER P50 than `-fast` (1.32s vs. 1.93s), and ~85%
+#      cheaper per query ($0.0004 vs. $0.0025 -- roughly $333/mo vs.
+#      $2,232/mo at 30K queries/day). One honest caveat: max latency was
+#      marginally worse than `-fast`'s (3.75s vs. 3.30s) on this small a
+#      sample -- not treated as a real tail-latency difference given it's
+#      one data point out of 10 on each side, but worth re-checking with a
+#      larger sample before treating the tail as fully resolved.
 DEFAULT_MODEL = os.environ.get(
-    "FIREWORKS_MODEL", "accounts/fireworks/routers/kimi-k2p7-code-fast"
+    "FIREWORKS_MODEL", "accounts/fireworks/models/gpt-oss-120b"
 )
 
 # Hard ceiling on total generation attempts for a single question (1 initial

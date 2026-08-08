@@ -1,60 +1,67 @@
-**Subject: Text-to-SQL CLI — PoC Update and Early Results**
+**Subject: Text-to-SQL PoC update**
 
-Hi Raul,
+Hey Raul,
 
-Quick update on the text-to-SQL PoC ahead of [final delivery] — here's what we've built, what we've validated so far, and where we're headed next.
+Wanted to give you a real update on the text-to-SQL PoC, not just "it's going well." Here's what we built, how it did against your test questions, and what's still rough.
 
 ## What we built
 
-Starting from your baseline prompt (`Convert this question to SQL: {question}`), we made four changes aimed directly at the three problems you flagged (accuracy, latency, cost):
+Starting from your baseline prompt (just "Convert this question to SQL: {question}"), we made a handful of changes aimed straight at the three problems you called out: accuracy, latency, and cost.
 
-- **Schema-aware prompting.** The baseline prompt gives the model zero information about your database, which is the direct cause of the hallucinated tables/columns and wrong JOINs you saw. We introspect the live database's own `CREATE TABLE` statements — including primary and foreign key constraints — and inject them into the system prompt, so the model is told exactly how your tables relate instead of guessing. This is derived automatically from whatever database is connected, so it works the same way for any customer schema, not just the sample data — matching the "point it at a connection string" experience you described.
-- **Structured outputs, not free-text parsing.** Rather than asking for prose and hoping to extract a SQL block out of it, we constrain the model's response to a strict JSON schema (`{"sql": "..."}`) using Fireworks' schema-constrained decoding. This removes an entire failure mode: "the SQL was actually fine, but our parser choked on how it was wrapped."
-- **Self-correcting execution loop.** Generated SQL is executed against the real database. If it errors, we feed the exact database error back to the model and let it retry (capped at 3 attempts total) before surfacing a clear failure to the user, rather than either silently failing or retrying forever.
-- **Prompt-prefix caching, architected in from the start.** Fireworks supports prompt caching, so we built around it deliberately: the schema and system instructions are constructed once per session and kept byte-identical across every turn, with the user's question appended at the end rather than mixed in. This lets repeated turns in a session reuse the cached prefix instead of reprocessing the full schema every time — directly targeting both latency (fewer tokens to actually process per turn) and cost (cached input tokens are billed at a steep discount on Fireworks' serverless tier — 80% off list price for the model we're testing with, not just the ~50% default). To fully realize this, we also pass a consistent session identifier on each request so repeat calls route to the same backend replica; without it, the cache can miss silently even when the prompt itself is unchanged. We've since measured this directly (see below) rather than just trusting the design — at GitLab's projected scale (~30K queries/day) this is a meaningful, now-verified lever on both your latency and unit-economics concerns.
+Schema-aware prompting. Your baseline gives the model zero information about the database, which is exactly why it was hallucinating tables and getting joins wrong. We pull the database's own CREATE TABLE statements, foreign keys included, and put them right in the prompt, so the model knows how your tables actually relate instead of guessing. This is pulled live from whatever database is connected, so it works the same way on any customer's schema, not just our sample data.
 
-The CLI also preserves conversation context, so follow-up questions ("now sort that by country") work without the user repeating themselves.
+Structured outputs instead of free text. Rather than asking the model to write prose and hoping we can extract a SQL block out of it, we constrain its response to a strict JSON shape using Fireworks' schema-constrained decoding. That kills a whole category of bug where the SQL was actually fine but our own parsing choked on it.
 
-## What we've validated so far
+A self-correcting execution loop. We actually run the generated SQL. If it errors, we hand the exact error back to the model and let it try again, up to 3 attempts, before giving up and telling the user clearly. No silent failures, no infinite retries either.
 
-We ran all 10 dev questions end-to-end (`generate_dev_answers.json` → `dev_answers.json`) and checked the generated SQL's *actual executed results* against the gold answers, not just whether it looked plausible:
+Prompt caching, designed in from day one. Fireworks caches repeated prompt prefixes, so we built around that on purpose: the schema and instructions get constructed once per session and stay identical turn to turn, with the actual question tacked on at the end. That means repeat turns reuse the cached prefix instead of reprocessing the whole schema every time, and cached tokens are billed a lot cheaper (80% off list on the model we tested, not just the usual 50% default). We also pass a consistent session ID on every request so repeat calls land on the same backend replica, otherwise the cache can miss silently even when nothing in the prompt changed. We measured this directly instead of just trusting the theory (more on that below), and at your projected volume it's a real lever on both latency and cost.
 
-- **10/10 substantively correct.** An automated results-comparison (matching on values, tolerant of extra/differently-named columns) shows 8/10 as an exact match; the other 2 (which employee has the most customers; top 5 customers by spend) are correct in substance on manual review — the only difference is our SQL returns first/last name as separate columns where the gold query concatenates them into one string. Same underlying data, different shape, not a wrong answer. We're calling this out explicitly rather than rounding up to "10/10" silently, since it's a real limitation of naive automated SQL-result grading worth remembering as this scales.
-- **Retry/self-correction is working, not just theoretical.** We forced both an execution failure and an attempted write statement in testing and confirmed the agent catches each, feeds the error back to the model, and gets a corrected query on the next attempt — capped at 3 attempts total so a persistently-wrong query can't spiral.
-- **Prompt caching is measurably working, not just designed to.** On a freshly started session (first call, cold by definition) we saw 1,405 of 1,419 prompt tokens (~99%) served from cache rather than reprocessed — direct evidence the fixed-prefix system prompt design is paying off, not just a theoretical benefit.
-- **Read-only enforcement**: generated SQL is validated as a single read-only SELECT statement before it's ever handed to the database — rejecting statement-stacking tricks (`SELECT 1; DROP TABLE ...`) and write statements smuggled behind a CTE, on top of the database connection itself only ever being queried, never given write access.
+Follow-up questions work too. Conversation history carries over within a session, so something like "now sort that by country" just works without repeating yourself.
 
-## Model comparison, and the latency problem we found (and chased down)
+## How it did on the 10 questions
 
-We ran all 10 dev questions against two candidates: `kimi-k2p7-code` (Fireworks' code-specialized model, our initial default) and its `-fast` router variant.
+We ran all 10 dev questions and checked the actual query results against your gold answers, not just whether the SQL looked plausible.
 
-| Model | Accuracy | Avg latency | **P50 latency** | Max latency | Cost / 10 questions |
-|---|---|---|---|---|---|
-| `kimi-k2p7-code` | 8/10 (10/10 substantively — see above) | 4.74s | **3.32s** | 14.12s | $0.0148 |
-| `kimi-k2p7-code-fast` | 8/10 (10/10 substantively) | 1.86s | **1.80s** | 4.02s | $0.0305 |
+All 10 are correct in substance. An automated check, comparing values and tolerant of extra or renamed columns, shows 8 of 10 as exact matches. The other 2 are right too on manual review; the model just returns first and last name as separate columns where the gold query concatenates them into one string. Same underlying data, different shape, not a wrong answer. We're pointing that out on purpose instead of quietly rounding up to 10/10, since it's a real limitation in how we're auto-grading this and worth remembering as it scales.
 
-Accuracy is identical between the two — same questions, same 2 substantively-correct-but-differently-shaped results either way. Latency is not: the base model's P50 sits right at your <3s target with a rough tail (14s max), while `-fast` comes in well under it with a much tighter spread.
+The retry logic actually works, we checked rather than assumed. We forced a bad query and an attempted write statement in testing and confirmed the agent catches both, sends the error back to the model, and gets a corrected query on the next try, capped at 3 attempts so nothing spirals.
 
-We didn't want to just report that gap — we wanted to know whether it was something in *our* design or genuinely a model/infrastructure difference, so we ran a controlled test: the same question, fired repeatedly, once creating a fresh connection each time (matching how our eval scripts call the agent today) and once reusing a single warm connection. Two findings:
+Caching is measurably working, not just theoretically. On a fresh session's very first call we saw 1,405 of 1,419 prompt tokens served from cache. That's direct proof the design is paying off, not just a nice idea on paper.
 
-1. **Response length isn't the cause.** Latency showed essentially zero correlation with completion token count (r ≈ 0.01–0.15) — the model isn't "thinking longer" on the slow calls.
-2. **Connection reuse helps, but doesn't close the gap.** A warm, reused connection cut latency variance roughly in half (stdev 2.03s → 0.79s) but still left a 2x+ spread (1.85s–4.14s) on functionally identical requests. That points to serving-side variance on the base model's standard tier, not something fixable in our request handling.
+Everything is read-only, enforced in code. Generated SQL gets checked to make sure it's a single SELECT statement before it ever touches the database. This blocks statement-stacking tricks and writes smuggled behind a CTE, on top of the database connection itself never being given write access at all.
 
-**Recommendation: ship with `kimi-k2p7-code-fast`.** Same accuracy, comfortably under your P50 target with a much more predictable tail, at roughly double the (already negligible) per-query cost — at 30K queries/day that's the difference between ~$45/day and ~$90/day, both trivial next to the GPT-5.4 baseline that made the unit economics not work in the first place.
+## Model comparison, and the latency issue we chased down
 
-## A known limitation worth naming explicitly
+Our first pass only compared kimi-k2p7-code against its own "fast" serving tier, same underlying weights, just a different serving tier, not actually two different models. That told us how to serve Kimi well, but nothing about whether Kimi was the right pick in the first place. So we widened it to 4 models, including two genuinely different families, before calling anything final.
 
-Our schema-injection approach uses the database's own `CREATE TABLE` statements (structure and types) but deliberately doesn't include sample data values. That's a reasonable scope call for a time-boxed PoC, but it has a real failure mode: questions that hinge on exact string matching can fail silently if the phrasing doesn't match how the data is actually stored. Concretely, in this dataset: a question phrased with "United States" would generate `WHERE Country = 'United States'` and return **zero rows**, because the database actually stores `'USA'`. The model has no way to know that from the schema alone — it's guessing.
+| Model | Accuracy | Avg latency | P50 latency | Max latency | Cost / 10 q | Cost / query |
+|---|---|---|---|---|---|---|
+| kimi-k2p7-code | 8/10 (10/10 in substance) | 3.74s | 3.69s | 7.26s | $0.0163 | $0.0016 |
+| kimi-k2p7-code-fast | 8/10 (10/10 in substance) | 1.82s | 1.93s | 3.30s | $0.0248 | $0.0025 |
+| gpt-oss-120b | 8/10 (10/10 in substance) | 1.75s | 1.32s | 3.75s | $0.0037 | $0.0004 |
+| deepseek-v4-flash | 8/10 (10/10 in substance) | 4.28s | 4.39s | 6.73s | $0.0027 | $0.0003 |
 
-For production, we'd want a governed way to expose representative values per column — ideally sourced from curated metadata rather than live-sampling a customer's tables at query time (both for correctness — someone should own what "representative" means for a column — and because live-sampling raw customer data into prompts raises its own governance questions). This is the same class of problem Databricks' Unity Catalog / Genie solves with column comments and curated sample values rather than direct table access, and we think that's the right model to follow here rather than reinventing it.
+A few things stood out. Accuracy was identical across all 4, same 8 of 10, same 2 questions "missed" every single time, which is a good sign that's a quirk in our grading rather than a real quality gap between models. gpt-oss-120b beat kimi-fast on every axis that actually matters here: better P50 (1.32s vs 1.93s), same accuracy, and roughly 85% cheaper, about $333/month vs $2,232/month at your projected 30K queries a day. We're not going to pretend it was a clean sweep though: its max latency (3.75s) was a touch worse than kimi-fast's (3.30s) in this run. That's one data point out of ten on each side, so we're not reading much into it yet, but it's worth another look with more data before we call the tail fully settled. And deepseek-v4-flash was the cheapest per query of the four but had the worst latency (P50 4.39s), so despite the name it wouldn't have hit your sub-3-second target in this test.
+
+Before landing on a serving tier, we also wanted to know whether the original latency swing was something in our own design or a genuine model/infrastructure difference. We ran a controlled test: the same question, fired repeatedly, once with a fresh connection each time and once reusing a single warm one. Two things came out of that. Response length wasn't the cause, latency barely correlated with how much the model actually generated. And connection reuse helped some but didn't close the gap; we still saw a 2x+ spread on identical requests against the base Kimi model, which points to serving-side variance on its standard tier rather than anything in our request handling.
+
+Recommendation: ship with gpt-oss-120b. Same accuracy as everything else we tried, the best P50 of the four, and a lot cheaper. It's a better result on every dimension you asked us to optimize for than our first pick, which is exactly why we went back and widened the comparison instead of just calling it done.
+
+## One limitation worth flagging directly
+
+Our schema approach uses the database's own table definitions but deliberately skips sample data values, to keep this pass simple. That has a real failure mode though: questions that hinge on exact string matches can fail silently if the wording doesn't match how the data is actually stored. In this dataset specifically, a question phrased around "United States" would generate a filter for that exact string and come back with zero rows, because the database stores "USA." The model has no way to know that just from the table structure, it's guessing.
+
+For production we'd want a governed way to surface representative values per column, ideally sourced from curated metadata rather than sampling a customer's live tables at query time. That's both a correctness thing (someone should own what "representative" means for a given column) and a governance thing (you don't want to be piping raw customer data into prompts by default). It's basically the same problem Unity Catalog and Genie solve with column comments and curated sample values instead of direct table access, and we think that's the right pattern to follow here rather than reinventing it.
 
 ## What's next
 
-1. **Ship `kimi-k2p7-code-fast`** as the default per the comparison above, and keep the CLI's `FIREWORKS_MODEL` override in place so this is a one-line change if your own validation says otherwise.
-2. **Build a governed column-value metadata layer** (see above) to close the exact-string-matching gap before this goes near real customer schemas.
-3. **Worth scoping as a phase 2, once there's real usage:** Fireworks supports model fine-tuning/distillation. At your projected volume (~30K queries/day), you'd accumulate a large set of (question, schema, generated SQL, execution outcome) examples quickly. Distilling a frontier model's SQL quality — or a curated set of confirmed-correct queries — into a small model fine-tuned specifically on your schema could push cost and latency meaningfully lower than prompt engineering alone can, without giving back the accuracy work. Not something to build in this exercise's time box, but a strong next lever once there's production traffic to learn from.
+Ship gpt-oss-120b as the default, and keep the FIREWORKS_MODEL override in place so switching is a one-line change if your own testing says otherwise. Worth rerunning this comparison against a bigger question set before treating it as fully settled; 10 questions is enough to catch a big problem, which is exactly how we caught the original latency issue, but it's thin for a confident production call at 30K queries a day.
 
-Happy to walk through the code and design decisions live whenever's useful.
+Build a governed column-value metadata layer to close the exact-string-matching gap before this goes near a real customer's schema.
+
+Worth scoping as a phase 2 once there's real usage: Fireworks supports fine-tuning and distillation. At your volume you'd build up a large set of question, schema, SQL, and outcome examples fast. Distilling a frontier model's SQL quality, or a curated set of confirmed-correct queries, into a small model tuned specifically for your schema could push cost and latency even lower without giving up the accuracy work. Not something to build in this pass, but a strong next step once there's real traffic to learn from.
+
+Happy to walk through the code live whenever's good for you.
 
 Best,
 [Your name]
