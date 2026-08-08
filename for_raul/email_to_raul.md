@@ -4,7 +4,13 @@
 
 Hi Raul,
 
-Here is a full update on the text-to-SQL proof of concept: what we built, how it performed against your test questions, and what we would tackle next.
+Quick summary up front, with the full detail below for anyone who wants it.
+
+- **What we built:** a schema-aware, self-correcting text-to-SQL CLI on Fireworks, structured outputs instead of free-text parsing, an execution-and-retry loop, prompt caching designed in from the start, and read-only enforcement on every query. A substantial upgrade from the baseline prompt on all three problems you flagged: accuracy, latency, and cost.
+- **How it performed:** all 10 dev questions answered correctly. 8 of 10 by exact mechanical match, 10 of 10 confirmed by an independent LLM-as-judge pass.
+- **How we validated it:** not just design intent. We forced execution failures and write attempts to confirm the retry logic actually works, measured real cache-hit rates, ran a controlled experiment to isolate the cause of a latency problem, and ran a two-run, four-model comparison that caught a genuine bug (a missing join) in one candidate.
+- **Recommendation:** ship with `gpt-oss-120b`. Best judged accuracy, comfortably under your 3-second latency target, and roughly 85% cheaper than our first pick.
+- **What's next:** rerun the model comparison at larger scale before treating it as fully settled, close a known exact-string-matching gap with governed column-value metadata, and scope model distillation once there is real production traffic to learn from.
 
 ## What We Built
 
