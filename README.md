@@ -1,5 +1,9 @@
 # Fireworks AI Field Engineering: Text-to-SQL
 
+> **Note on this repository's structure:** the [`for_raul/`](for_raul/) folder is the actual customer-facing deliverable, the specific subset we would hand to Raul directly (implementation, README, `dev_answers.json`, and the email). Everything else in this repository, including the agent and CLI source outside that folder, `compare_models.py`, `diagnose_latency.py`, `llm_judge_eval.py`, and their output files, is our own development and validation work. It supports the conclusions in the email but is not something we would share with the customer as-is.
+>
+> **Note on AI assistance:** this submission was built with the help of Claude Code for implementation and Claude for design discussion and code review throughout, as also disclosed in the email to Raul.
+
 This take-home is meant to mirror part of the AI Field Engineer role: supporting customers in their journey to build GenAI applications on Fireworks.
 
 In this exercise, you should approach the problem like a Fireworks engineer supporting a customer who needs a text-to-SQL agent that can run as an interactive CLI.
