@@ -4,7 +4,9 @@
 
 Hi Raul,
 
-Here's where things stand on the text-to-SQL PoC.
+Attached is a zip with everything you need to try this yourself: the working CLI and source, a README with exact setup steps, and `dev_answers.json` showing our outputs on all 10 dev questions so you can see exactly what we tested. Setup is a few minutes with your own Fireworks API key, the README walks through it.
+
+Here's where things stand on the PoC itself.
 
 **What we built:** an interactive CLI on Fireworks that converts natural language into SQL against any database you point it at. It reads your actual table structure and foreign keys instead of guessing at them, returns structured output instead of free text, automatically retries failed queries with the error fed back to the model, enforces read-only access, and caches the schema and instructions across turns to keep latency and cost down.
 
@@ -21,7 +23,7 @@ Here's where things stand on the text-to-SQL PoC.
 
 It is the only model that stayed both fast and accurate across two separate comparison runs: comfortably under your 3-second target and roughly 85% cheaper than our first pick.
 
-**How we validated it:** beyond the dev-question results above, we forced execution failures and write attempts to confirm the retry and safety logic actually work, measured real prompt-cache hit rates rather than assuming caching helps, and ran a controlled experiment to isolate the cause of an early latency problem. Full methodology and data are in the repository for review.
+**How we validated it:** beyond the dev-question results above, we forced execution failures and write attempts to confirm the retry and safety logic actually work, measured real prompt-cache hit rates rather than assuming caching helps, and ran a controlled experiment to isolate the cause of an early latency problem. Happy to share the underlying test scripts and raw data if it would be useful on your end.
 
 **One limitation worth flagging directly:** our schema approach does not include sample data values, so questions that depend on exact string matches (for example, "United States" versus the database's stored "USA") can fail silently. We would want a governed way to surface representative column values before this goes near a real customer schema.
 
