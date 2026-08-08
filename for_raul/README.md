@@ -2,6 +2,8 @@
 
 An interactive terminal tool that converts natural-language questions into SQL, runs them against your database, and returns the results. Built on Fireworks-hosted open-source models.
 
+*Built with the help of Claude Code for implementation and Claude for design discussion and code review throughout.*
+
 ## Prerequisites
 
 - [`uv`](https://github.com/astral-sh/uv) (Python package/environment manager)
