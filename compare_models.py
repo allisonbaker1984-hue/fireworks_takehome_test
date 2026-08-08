@@ -1,7 +1,7 @@
 """
-Compare candidate Fireworks models on the 10 dev questions: accuracy
-(execution match against data/dev_questions_with_answers.json), latency,
-how often the retry loop fired, and estimated cost.
+Compare candidate Fireworks models on the 10 dev questions: accuracy (both
+mechanical results_match AND an LLM-as-judge pass), latency, how often the
+retry loop fired, and estimated cost.
 
 Usage:
     uv run python compare_models.py
@@ -11,8 +11,15 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from src.agent import TextToSQLAgent
+from src.agent import DEFAULT_MODEL, TextToSQLAgent, judge_answer
 from src.utils import load_db, results_match
+
+# Model used to judge every candidate's answers, held constant across the
+# whole comparison so the judge itself isn't a variable between rows in the
+# table. Uses our own shipped default rather than a separate "grader" model
+# -- it already proved reliable as a judge in llm_judge_eval.py (10/10
+# agreement with manual review on dev_answers.json).
+JUDGE_MODEL = DEFAULT_MODEL
 
 DB_PATH = "data/Chinook.db"
 QUESTIONS_PATH = "data/dev_questions.json"
@@ -81,6 +88,26 @@ def run_one_model(
                 and not result.unanswerable
                 and results_match(gold[qid]["expected_result"], result.rows or [])
             )
+
+            # Judge on the raw executed rows against the gold prose answer,
+            # rather than routing through summarize() first -- this is
+            # testing whether the SQL got the right data, not the quality
+            # of a separate summarization step (dev_answers.json's
+            # LLM-judge pass already covers that layer).
+            if result.rows:
+                verdict = judge_answer(
+                    agent.client,
+                    JUDGE_MODEL,
+                    question,
+                    gold[qid]["gold_answer"],
+                    json.dumps(result.rows, default=str),
+                )
+                llm_judge_correct = verdict.correct
+                llm_judge_reasoning = verdict.reasoning
+            else:
+                llm_judge_correct = False
+                llm_judge_reasoning = "No valid results to judge."
+
             record = {
                 "id": qid,
                 "sql": result.sql,
@@ -89,6 +116,8 @@ def run_one_model(
                 "error": result.error,
                 "unanswerable": result.unanswerable,
                 "correct": correct,
+                "llm_judge_correct": llm_judge_correct,
+                "llm_judge_reasoning": llm_judge_reasoning,
                 "prompt_tokens": agent.total_prompt_tokens,
                 "cached_prompt_tokens": agent.total_cached_prompt_tokens,
                 "completion_tokens": agent.total_completion_tokens,
@@ -109,6 +138,8 @@ def run_one_model(
                 "error": str(e),
                 "unanswerable": False,
                 "correct": False,
+                "llm_judge_correct": False,
+                "llm_judge_reasoning": f"Skipped due to error: {e}",
                 "prompt_tokens": 0,
                 "cached_prompt_tokens": 0,
                 "completion_tokens": 0,
@@ -116,9 +147,10 @@ def run_one_model(
             }
 
         per_question.append(record)
-        status = "OK  " if record["correct"] else "MISS"
+        mech = "OK  " if record["correct"] else "MISS"
+        judged = "OK  " if record["llm_judge_correct"] else "MISS"
         print(
-            f"  [{i}/{len(questions)}] {qid}: {status}  "
+            f"  [{i}/{len(questions)}] {qid}: mechanical={mech} judge={judged}  "
             f"{record['attempts']} attempt(s), {record['latency_seconds']:.2f}s, "
             f"${record['estimated_cost_usd']:.5f}"
         )
@@ -129,6 +161,7 @@ def run_one_model(
 
     summary = {
         "accuracy": sum(r["correct"] for r in per_question) / n,
+        "llm_judge_accuracy": sum(r["llm_judge_correct"] for r in per_question) / n,
         "avg_latency_seconds": sum(latencies) / n,
         "p50_latency_seconds": latencies[n // 2],
         "max_latency_seconds": latencies[-1],
@@ -155,7 +188,8 @@ def main() -> None:
         s = all_results[model]["summary"]
         print("-" * 100)
         print(
-            f"Accuracy: {s['accuracy']*100:.0f}%  |  "
+            f"Accuracy (mechanical): {s['accuracy']*100:.0f}%  |  "
+            f"Accuracy (LLM judge): {s['llm_judge_accuracy']*100:.0f}%  |  "
             f"Avg latency: {s['avg_latency_seconds']:.2f}s  |  "
             f"P50 latency: {s['p50_latency_seconds']:.2f}s  |  "
             f"Max latency: {s['max_latency_seconds']:.2f}s  |  "

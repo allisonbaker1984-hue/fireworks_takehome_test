@@ -1,5 +1,7 @@
 **Subject: Text-to-SQL PoC Update**
 
+*This PoC was built with the help of Claude Code for implementation and Claude for design discussion and code review throughout.*
+
 Hi Raul,
 
 Here is a full update on the text-to-SQL proof of concept: what we built, how it performed against your test questions, and what we would tackle next.
@@ -18,9 +20,9 @@ Starting from your baseline prompt ("Convert this question to SQL: {question}"),
 
 We ran all 10 dev questions and validated the generated SQL's actual executed results against your gold answers, not just whether the SQL looked reasonable.
 
-All 10 are correct in substance. An automated comparison (matching on values, tolerant of extra or differently named columns) shows 8 of 10 as exact matches. The remaining 2 are correct on manual review as well; the difference is that our SQL returns first and last name as separate columns where the gold query concatenates them into a single string. Same underlying data, different shape, not an incorrect answer. We are calling this out explicitly rather than rounding up silently to 10 of 10, since it reflects a real limitation in automated SQL-result grading worth keeping in mind as this scales.
+All 10 are correct in substance, and we checked this two different ways rather than taking our own word for it. A mechanical comparison (matching query results by value, tolerant of extra or differently named columns) shows 8 of 10 as exact matches; the remaining 2 differ only in that our SQL returns first and last name as separate columns where the gold query concatenates them into a single string. Same underlying data, different shape. Rather than rely on our own read of "these are basically the same," we ran those 2 (and the other 8, as a check) through a second, independent evaluation: an LLM-as-judge pass that compares each generated answer against the reference answer for substantive correctness rather than exact value matching. That pass returned 10 of 10 correct, including both cases the mechanical check flagged. We are keeping both numbers in view rather than reporting only the more favorable one: 8 of 10 is what naive value-matching finds, 10 of 10 is what a semantic-equivalence check finds, and the gap between them is itself a useful reminder of how brittle simple SQL-result grading can be at scale.
 
-A few points we validated directly rather than assumed:
+A few other points we validated directly rather than assumed:
 
 - **Retry and self-correction.** We deliberately forced an execution failure and an attempted write statement in testing, and confirmed the agent catches both, feeds the error back to the model, and produces a corrected query on the next attempt.
 - **Prompt caching.** On a freshly started session's first call, 1,405 of 1,419 prompt tokens were served from cache, direct evidence the caching design is working as intended rather than being a theoretical benefit.
@@ -30,18 +32,20 @@ A few points we validated directly rather than assumed:
 
 Our first comparison only tested `kimi-k2p7-code` against its own "fast" serving tier: the same underlying model on a different serving tier, not two distinct models. That told us how to serve Kimi well, but not whether Kimi was the right choice to begin with. We broadened the comparison to four models, including two genuinely different model families, before finalizing a recommendation.
 
-| Model | Accuracy | Avg Latency | P50 Latency | Max Latency | Cost / 10 Questions | Cost / Query |
-|---|---|---|---|---|---|---|
-| kimi-k2p7-code | 8/10 (10/10 in substance) | 3.74s | 3.69s | 7.26s | $0.0163 | $0.0016 |
-| kimi-k2p7-code-fast | 8/10 (10/10 in substance) | 1.82s | 1.93s | 3.30s | $0.0248 | $0.0025 |
-| gpt-oss-120b | 8/10 (10/10 in substance) | 1.75s | 1.32s | 3.75s | $0.0037 | $0.0004 |
-| deepseek-v4-flash | 8/10 (10/10 in substance) | 4.28s | 4.39s | 6.73s | $0.0027 | $0.0003 |
+| Model | Mechanical Accuracy | LLM-Judge Accuracy | Avg Latency | P50 Latency | Max Latency | Cost / 10 Questions | Cost / Query |
+|---|---|---|---|---|---|---|---|
+| kimi-k2p7-code | 8/10 | 10/10 | 4.68s | 5.17s | 8.48s | $0.0149 | $0.0015 |
+| kimi-k2p7-code-fast | 7/10 | 9/10 | 1.51s | 1.56s | 2.43s | $0.0217 | $0.0022 |
+| gpt-oss-120b | 8/10 | 10/10 | 1.60s | 1.73s | 2.72s | $0.0037 | $0.0004 |
+| deepseek-v4-flash | 8/10 | 10/10 | 6.55s | 5.81s | 26.42s | $0.0026 | $0.0003 |
 
-Accuracy was identical across all four models, with the same 8 of 10 exact matches and the same 2 substantively correct mismatches every time, which confirms this is a grading artifact rather than a real quality gap between models. `gpt-oss-120b` outperformed `kimi-k2p7-code-fast` on every dimension that matters here: a better P50 (1.32s versus 1.93s), equivalent accuracy, and roughly 85% lower cost (an estimated $333 per month versus $2,232 per month at your projected volume of 30,000 queries per day). One caveat worth noting honestly: its max latency (3.75s) was marginally higher than `kimi-k2p7-code-fast`'s (3.30s) in this run. That is a single data point on each side, so we are not treating it as settled, and would want to confirm it holds with a larger sample. `deepseek-v4-flash` was the cheapest per query but had the worst latency of the four (P50 4.39s) and would not have met your sub-3-second target in this test.
+The LLM-judge column is a second, independent evaluation pass: rather than the mechanical results_match check comparing query results by value, we have a model judge whether each generated answer is substantively correct against the reference answer. It is not a rubber stamp. In this run it caught a real bug, not just a formatting quirk: `kimi-k2p7-code-fast` used an inner join between Playlist and PlaylistTrack on the "tracks per playlist" question, which silently drops any playlist with zero tracks from the results. Both the mechanical check and the judge flagged it correctly, which is exactly the kind of failure a customer-facing tool cannot afford to miss. That single miss is also why `kimi-k2p7-code-fast`'s judged accuracy (9/10) is lower than the other three models (10/10 each) in this run.
 
-Before selecting a serving tier, we also wanted to determine whether the original latency variance was something in our own design or a genuine model or infrastructure difference. We ran a controlled test, firing the same question repeatedly: once with a fresh connection each time, and once reusing a single warm connection. Two findings came out of that. Response length was not the cause; latency showed essentially no correlation with completion token count. And connection reuse reduced but did not eliminate the variance, still leaving a greater than 2x spread on functionally identical requests against the base Kimi model. That points to serving-side variance on its standard tier rather than anything fixable in our own request handling.
+`gpt-oss-120b` is the strongest overall result: judged accuracy tied for the best of the four, latency comfortably under your 3-second target, and by far the lowest cost among the models that actually meet that latency bar. `deepseek-v4-flash` is worth flagging as unreliable despite being cheapest per query: it hit a 26.42-second outlier on a single question in this run, more than eight times its own average. We ran this comparison twice, and the latency rankings shifted meaningfully between runs for every model except `gpt-oss-120b`, which stayed consistently fast and consistently accurate both times. That is a useful data point in `gpt-oss-120b`'s favor, and also a reminder that 10 questions, run once or twice, is not enough data to fully trust any single latency number at your production volume.
 
-**Recommendation:** ship with `gpt-oss-120b`. It matches the accuracy of every other model tested, delivers the best P50 latency of the four, and costs substantially less. It is a stronger result on every dimension you asked us to optimize for than our initial recommendation, which is why we went back and broadened the comparison rather than stopping at an acceptable answer.
+Separately from the model comparison, we also wanted to understand whether the latency variance we first saw was something in our own design or a genuine model or infrastructure difference. We ran a controlled test, firing the same question repeatedly: once with a fresh connection each time, and once reusing a single warm connection. Two findings came out of that. Response length was not the cause; latency showed essentially no correlation with completion token count. And connection reuse reduced but did not eliminate the variance, still leaving a greater than 2x spread on functionally identical requests against the base Kimi model. That points to serving-side variance rather than anything fixable in our own request handling.
+
+**Recommendation:** ship with `gpt-oss-120b`. It tied for the best judged accuracy, stayed comfortably under your latency target in both comparison runs while every other model's ranking shifted meaningfully between runs, and costs substantially less than either Kimi variant. It is a stronger, more consistent result than our initial recommendation, which is why we went back and broadened the comparison rather than stopping at an acceptable answer.
 
 ## A Limitation Worth Flagging Directly
 
