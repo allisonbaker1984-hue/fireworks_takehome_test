@@ -21,7 +21,7 @@ Good to share an update on the text-to-SQL PoC, we made real progress and learne
 
 It's the only model that stayed both fast and accurate across two separate comparison runs: comfortably under your 3-second target and roughly 85% cheaper than our first pick.
 
-**How we validated it:** beyond the dev-question results above, we forced execution failures and write attempts to confirm the retry and safety logic actually work, measured real prompt-cache hit rates rather than assuming caching helps, and ran a controlled experiment to isolate the cause of an early latency problem. Happy to share the underlying test scripts and raw data if that would be useful on your end.
+**How we validated it:** beyond the dev-question results above, we forced execution failures and write attempts to confirm the retry and safety logic actually work, measured real prompt-cache hit rates rather than assuming caching helps, and ran a controlled experiment to isolate the cause of an early latency problem. We kept those scripts out of the attached zip to keep things focused, but happy to share and walk through them if useful: the model comparison harness, the latency diagnostic, and the LLM-judge evaluation.
 
 **One limitation worth flagging directly:** our schema approach doesn't include sample data values, so questions that depend on exact string matches (for example, "United States" versus the database's stored "USA") can fail silently. We'd want a governed way to surface representative column values before this goes near a real customer schema.
 
