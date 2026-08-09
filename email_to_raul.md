@@ -4,7 +4,9 @@
 
 Hi Raul,
 
-Good to share an update on the text-to-SQL PoC, we made real progress and learned some useful things along the way. Attached is a zip with everything you need to try it yourself: the working CLI and source, a README with exact setup steps, and `dev_answers.json` showing our outputs on all 10 dev questions so you can see exactly what we tested. Setup's just a few minutes with your own Fireworks API key, the README walks through it.
+Thanks for sharing the sample database, the test questions, and such a clear picture of where the prototype was falling short, it made this a lot easier to build against. Good to share an update on the PoC, we made real progress and learned some useful things along the way.
+
+Attached is a zip with everything you need to try it yourself: the working CLI and source, a README with exact setup steps, and `dev_answers.json` showing our outputs on all 10 dev questions so you can see exactly what we tested. Setup's just a few minutes with your own Fireworks API key, the README walks through it.
 
 **What we built:** an interactive CLI on Fireworks that converts natural language into SQL against any database you point it at. It reads your actual table structure and foreign keys instead of guessing at them, returns structured output instead of free text, automatically retries failed queries with the error fed back to the model, enforces read-only access, and caches the schema and instructions across turns to keep latency and cost down.
 
@@ -21,7 +23,7 @@ Good to share an update on the text-to-SQL PoC, we made real progress and learne
 
 It's the only model that stayed both fast and accurate across two separate comparison runs: comfortably under your 3-second target and roughly 85% cheaper than our first pick.
 
-**How we validated it:** beyond the dev-question results above, we forced execution failures and write attempts to confirm the retry and safety logic actually work, measured real prompt-cache hit rates rather than assuming caching helps, and ran a controlled experiment to isolate the cause of an early latency problem. Happy to share the underlying test scripts and raw data if that would be useful on your end.
+**How we validated it:** beyond the dev-question results above, we forced execution failures and write attempts to confirm the retry and safety logic actually work, measured real prompt-cache hit rates rather than assuming caching helps, and ran a controlled experiment to isolate the cause of an early latency problem. We kept those scripts out of the attached zip to keep things focused, but happy to share and walk through them if useful: the model comparison harness, the latency diagnostic, and the LLM-judge evaluation.
 
 **One limitation worth flagging directly:** our schema approach doesn't include sample data values, so questions that depend on exact string matches (for example, "United States" versus the database's stored "USA") can fail silently. We'd want a governed way to surface representative column values before this goes near a real customer schema.
 
