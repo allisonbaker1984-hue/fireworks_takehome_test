@@ -25,7 +25,7 @@ from src.agent import DEFAULT_MODEL, FIREWORKS_BASE_URL, judge_answer
 
 load_dotenv()
 
-ANSWERS_PATH = "dev_answers.json"
+ANSWERS_PATH = "data/dev_answers.json"
 GOLD_PATH = "data/dev_questions_with_answers.json"
 OUTPUT_PATH = "llm_judge_results.json"
 
