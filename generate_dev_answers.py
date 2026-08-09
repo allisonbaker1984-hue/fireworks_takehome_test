@@ -16,7 +16,7 @@ from src.utils import load_db
 
 DB_PATH = "data/Chinook.db"
 QUESTIONS_PATH = "data/dev_questions.json"
-OUTPUT_PATH = "dev_answers.json"
+OUTPUT_PATH = "data/dev_answers.json"
 
 
 def _answer_for(agent: TextToSQLAgent, question: str) -> Tuple[str, str]:
